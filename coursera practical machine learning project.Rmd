@@ -1,0 +1,119 @@
+---
+title: "practical machine learning - project"
+author: "radc"
+date: "December 21, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+Data
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+The goal of this project is to predict the manner in which they did the exercise. I this project I will create a report describing how I built my model, how I used cross validation, what the expected out of sample error is, and why I made the choices I did. 
+
+First is to load the required r packages and the data. The code below will work only if the file (see link above) is already in the working directory. The data was also cleaned using the code below. I removed varaibles containing a lot of "NA" and the first 5 columns as it not related to the prediction.
+
+```{r getting and cleaning}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(knitr)
+library(gbm)
+library(rmarkdown)
+
+testing<-read.csv("pml-testing.csv")
+training<-read.csv("pml-training.csv")
+set.seed(2221)
+
+
+nearzeroind <- nearZeroVar(training, saveMetrics=TRUE)
+training <- training[,nearzeroind$nzv==FALSE]
+training <- training[, colSums(is.na(training)) == 0]
+training <- training[, -c(1:5)]
+dim(training)
+```
+
+Partition was next created. The data was divided as 70% for the training and 30% for testing. 
+``` {r data partition}
+
+inTrain <- createDataPartition(training$classe, p=0.70, list = FALSE)
+pmltraining <- training[inTrain,]
+pmltesting<- training[-inTrain,]
+dim(pmltraining)
+dim(pmltesting)
+
+
+```
+
+##Training using classification tree
+``` {r classification tree}
+
+
+classificationtree_model <- rpart(classe~.,data=pmltraining, method="class")
+fancyRpartPlot(classificationtree_model)
+
+classificationtree_validation <- predict(classificationtree_model, pmltesting, type = "class")
+cm_classficationtree <- confusionMatrix(classificationtree_validation, pmltesting$classe)
+cm_classficationtree 
+
+```
+Using the classification tree for prediction, I came up with 73.78% accuracy. 
+
+##Training using random forest
+``` {r random forest}
+
+randomforest_model <- randomForest(classe~.,data=pmltraining)
+
+randomforest_validation <- predict(randomforest_model, pmltesting, type="class")
+cm_randomforest <- confusionMatrix(pmltesting$classe, randomforest_validation)
+cm_randomforest
+
+
+```
+
+```{r random forest graph, echo=FALSE}
+plot(randomforest_model)
+```
+
+Using the random forest for prediction, I came up with 99.76% accuracy, which is really high. 
+
+##Training using generalized boosted regression
+``` {r generalized boosted regression}
+
+control_gbr <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+
+gbm_model <- train(classe ~ ., data=pmltraining, method = "gbm", trControl = control_gbr, verbose = FALSE)
+gbm_model
+
+gbm_validation <- predict(gbm_model, newdata=pmltesting)
+cm_gbm <- confusionMatrix(gbm_validation, pmltesting$classe)
+cm_gbm
+
+```
+
+```{r generalized boosted regression, echo=FALSE}
+plot(gbm_model)
+```
+
+
+Using the generalized boosted regression for prediction, I came up with 98.76% accuracy
+
+The random forest gave the hihghest accuracy, thus this model will be used for the testing data. The out-of-sample error is 100% - 99.76% = 0.24% only. 
+
+##Using the best preciction model on the testing data
+``` {r testing data}
+
+prediction_testing <- predict(randomforest_model, testing)
+prediction_testing
+
+```
