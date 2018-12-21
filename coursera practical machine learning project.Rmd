@@ -101,7 +101,7 @@ cm_gbm
 
 ```
 
-```{r generalized boosted regression, echo=FALSE}
+```{r generalized boosted regression graph, echo=FALSE}
 plot(gbm_model)
 ```
 
